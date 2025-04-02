@@ -1,46 +1,49 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "Khoaiii",
-    LoadingTitle = "script potato",
-    LoadingSubtitle = "by Khoai",
+    Name = "Farm Pirate",
+    LoadingTitle = "Auto Farming System",
+    LoadingSubtitle = "By Khoai",
     Theme = "Default"
 })
 
-local FarmTab = Window:CreateTab("Farm", 4483362458)
+local FarmTab = Window:CreateTab("Farm Pirate", 4483362458)
 local player = game.Players.LocalPlayer
-local farmEnabled = false
 
--- Vị trí cố định để chờ cho Pirate spawn
+-- Vị trí chờ cố định
 local waitingPosition = CFrame.new(-3355, 918, 15241)
 
+-----------------------------------------
+-- SECTION: Farm Movement (di chuyển)
+-----------------------------------------
+FarmTab:CreateSection("Farm Movement")
+
+local farmMovementEnabled = false
 FarmTab:CreateToggle({
-    Name = "Farm",
+    Name = "Farm Movement",
     CurrentValue = false,
-    Flag = "FarmToggle",
+    Flag = "FarmMovementToggle",
     Callback = function(Value)
-        farmEnabled = Value
-        if farmEnabled then
-            local livingFolder = workspace:FindFirstChild("Living")
-            if not livingFolder then
-                Rayfield:Notify({
-                    Title = "Farm",
-                    Content = "Folder 'Living' không tồn tại!",
-                    Duration = 3
-                })
-                return
-            end
-            
-            local character = player.Character or player.CharacterAdded:Wait()
-            local hrp = character:WaitForChild("HumanoidRootPart")
-            
-            -- Đưa người chơi về vị trí chờ ban đầu
-            hrp.CFrame = waitingPosition
-            print("Đưa người chơi về vị trí chờ:", waitingPosition.Position)
-            
+        farmMovementEnabled = Value
+        if farmMovementEnabled then
             spawn(function()
-                while farmEnabled do
-                    -- Tạo danh sách các NPC Pirate có đủ điều kiện
+                local livingFolder = workspace:FindFirstChild("Living")
+                if not livingFolder then
+                    Rayfield:Notify({
+                        Title = "Farm Movement",
+                        Content = "Folder 'Living' không tồn tại!",
+                        Duration = 3
+                    })
+                    return
+                end
+
+                local character = player.Character or player.CharacterAdded:Wait()
+                local hrp = character:WaitForChild("HumanoidRootPart")
+                
+                hrp.CFrame = waitingPosition
+                print("[Farm Movement] Đưa người chơi về vị trí chờ:", waitingPosition.Position)
+                
+                while farmMovementEnabled do
                     local pirates = {}
                     for _, child in ipairs(livingFolder:GetChildren()) do
                         if child.Name == "Pirate" and child:FindFirstChild("HumanoidRootPart") then
@@ -50,10 +53,8 @@ FarmTab:CreateToggle({
                     
                     if #pirates == 0 then
                         hrp.CFrame = waitingPosition
-                        print("Không có Pirate. Chờ tại vị trí:", waitingPosition.Position)
-                        task.wait(0.1)
+                        print("[Farm Movement] Không có Pirate. Chờ tại vị trí:", waitingPosition.Position)
                     else
-                        -- Chọn NPC Pirate gần nhất
                         local closestPirate = pirates[1]
                         local closestDistance = (closestPirate.HumanoidRootPart.Position - hrp.Position).Magnitude
                         for i = 2, #pirates do
@@ -64,35 +65,117 @@ FarmTab:CreateToggle({
                             end
                         end
                         
-                        local npcHRP = closestPirate.HumanoidRootPart
-                        local desiredPos = npcHRP.Position - npcHRP.CFrame.LookVector * 4
-                        print("Pirate tồn tại. Vị trí mong muốn phía sau Pirate:", desiredPos)
-                        
-                        -- Vòng lặp di chuyển người chơi đến vị trí mong muốn
-                        while farmEnabled and closestPirate and closestPirate:FindFirstChild("HumanoidRootPart") and 
-                              (hrp.Position - desiredPos).Magnitude > 1 do
-                            hrp.CFrame = CFrame.new(desiredPos, npcHRP.Position)
-                            print("Di chuyển tới:", desiredPos, " | Vị trí hiện tại:", hrp.Position)
-                            task.wait(0.1)
+                        if closestPirate then
+                            local npcHRP = closestPirate.HumanoidRootPart
+                            local desiredPos = npcHRP.Position - npcHRP.CFrame.LookVector * 4
+                            print("[Farm Movement] Pirate tồn tại. Di chuyển đến vị trí sau Pirate:", desiredPos)
                             
-                            -- Cập nhật lại thông tin nếu Pirate thay đổi vị trí
-                            if closestPirate and closestPirate:FindFirstChild("HumanoidRootPart") then
-                                npcHRP = closestPirate.HumanoidRootPart
-                                desiredPos = npcHRP.Position - npcHRP.CFrame.LookVector * 4
-                            else
-                                break
+                            while farmMovementEnabled and closestPirate and (hrp.Position - desiredPos).Magnitude > 1 do
+                                hrp.CFrame = CFrame.new(desiredPos, npcHRP.Position)
+                                print("[Farm Movement] Đã duy trì vị trí sau Pirate.")
+                                task.wait(0.1)
                             end
                         end
-                        
-                        print("Đã đạt vị trí phía sau Pirate. Đang dừng di chuyển và chờ cập nhật.")
-                        task.wait(0.1)
                     end
-                    task.wait(0.1)  -- Vòng lặp chính chạy mỗi 0.1 giây
+                    task.wait(0.1)
                 end
-                print("Farm đã tắt.")
+                print("[Farm Movement] Farm Movement đã tắt.")
             end)
         else
-            print("Farm đã dừng.")
+            print("[Farm Movement] Đã tắt Farm Movement.")
+        end
+    end
+})
+
+-----------------------------------------
+-- SECTION: Auto Attack (tấn công nhanh)
+-----------------------------------------
+FarmTab:CreateSection("Auto Attack")
+
+local autoAttackEnabled = false
+FarmTab:CreateToggle({
+    Name = "Auto Attack",
+    CurrentValue = false,
+    Flag = "AutoAttackToggle",
+    Callback = function(Value)
+        autoAttackEnabled = Value
+        if autoAttackEnabled then
+            spawn(function()
+                local fireInput = game:GetService("ReplicatedStorage")
+                                    :WaitForChild("ReplicatedModules")
+                                    :WaitForChild("KnitPackage")
+                                    :WaitForChild("Knit")
+                                    :WaitForChild("Services")
+                                    :WaitForChild("MoveInputService")
+                                    :WaitForChild("RF")
+                                    :WaitForChild("FireInput")
+                
+                print("[Auto Attack] Bắt đầu tấn công với tốc độ cao!")
+                
+                while autoAttackEnabled do
+                    local args = { [1] = "MouseButton1" }
+                    fireInput:InvokeServer(unpack(args))
+                    task.wait(0.01) -- tăng tốc bằng cách giảm thời gian chờ
+                end
+                
+                print("[Auto Attack] Auto Attack đã dừng.")
+            end)
+        else
+            print("[Auto Attack] Đã tắt Auto Attack.")
+        end
+    end
+})
+
+-----------------------------------------
+-- SECTION: Auto Skill (Kỹ năng tự động)
+-----------------------------------------
+FarmTab:CreateSection("Auto Skill")
+
+local autoSkillEnabled = false
+local selectedSkill = "None"
+
+FarmTab:CreateDropdown({
+    Name = "Chọn Kỹ Năng",
+    Options = { "Skill1", "Skill2", "Skill3", "Skill4" },
+    CurrentOption = "None",
+    Flag = "AutoSkillDropdown",
+    Callback = function(Option)
+        selectedSkill = Option
+        print("[Auto Skill] Đã chọn kỹ năng:", selectedSkill)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Auto Skill",
+    CurrentValue = false,
+    Flag = "AutoSkillToggle",
+    Callback = function(Value)
+        autoSkillEnabled = Value
+        if autoSkillEnabled then
+            spawn(function()
+                local skillInput = game:GetService("ReplicatedStorage")
+                                    :WaitForChild("ReplicatedModules")
+                                    :WaitForChild("KnitPackage")
+                                    :WaitForChild("Knit")
+                                    :WaitForChild("Services")
+                                    :WaitForChild("SkillService")
+                                    :WaitForChild("RF")
+                                    :WaitForChild("UseSkill")
+                
+                print("[Auto Skill] Tự động sử dụng kỹ năng:", selectedSkill)
+                
+                while autoSkillEnabled do
+                    if selectedSkill ~= "None" then
+                        local args = { [1] = selectedSkill }
+                        skillInput:InvokeServer(unpack(args))
+                    end
+                    task.wait(1.0) -- Điều chỉnh tốc độ kỹ năng tại đây
+                end
+                
+                print("[Auto Skill] Đã dừng Auto Skill.")
+            end)
+        else
+            print("[Auto Skill] Đã tắt Auto Skill.")
         end
     end
 })
