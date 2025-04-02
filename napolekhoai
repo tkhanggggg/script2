@@ -12,7 +12,7 @@ local player = game.Players.LocalPlayer
 local farmEnabled = false
 
 FarmTab:CreateToggle({
-    Name = "Farm",
+    Name = "Farm Fingers",
     CurrentValue = false,
     Flag = "FarmToggle",
     Callback = function(Value)
