@@ -1,18 +1,21 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Khoaiii",
-   LoadingTitle = "script potato",
-   LoadingSubtitle = "by Khoai",
-   Theme = "Default"
+    Name = "Khoaiii",
+    LoadingTitle = "script potato",
+    LoadingSubtitle = "by Khoai",
+    Theme = "Default"
 })
 
 local FarmTab = Window:CreateTab("Farm", 4483362458)
 local player = game.Players.LocalPlayer
 local farmEnabled = false
 
+-- Vị trí cố định để chờ cho Pirate spawn
+local waitingPosition = CFrame.new(-3355, 918, 15241)
+
 FarmTab:CreateToggle({
-    Name = "Farm Fingers",
+    Name = "Farm",
     CurrentValue = false,
     Flag = "FarmToggle",
     Callback = function(Value)
@@ -27,41 +30,69 @@ FarmTab:CreateToggle({
                 })
                 return
             end
-
-            local npc = livingFolder:FindFirstChild("The Strongest In History")
+            
             local character = player.Character or player.CharacterAdded:Wait()
             local hrp = character:WaitForChild("HumanoidRootPart")
-
-            if npc and npc:FindFirstChild("HumanoidRootPart") then
-                hrp.CFrame = CFrame.new(-41, 4, -9742)
-                spawn(function()
-                    while farmEnabled do
-                        local currentNpc = livingFolder:FindFirstChild("The Strongest In History")
-                        if currentNpc and currentNpc:FindFirstChild("HumanoidRootPart") then
-                            local npcHRP = currentNpc.HumanoidRootPart
-                            local behindPos = npcHRP.Position - npcHRP.CFrame.LookVector * 4
-                            hrp.CFrame = CFrame.new(behindPos, npcHRP.Position)
-                        else
-                            Rayfield:Notify({
-                                Title = "Farm",
-                                Content = "Không tìm thấy NPC!",
-                                Duration = 3
-                            })
-                            farmEnabled = false
-                            break
+            
+            -- Đưa người chơi về vị trí chờ ban đầu
+            hrp.CFrame = waitingPosition
+            print("Đưa người chơi về vị trí chờ:", waitingPosition.Position)
+            
+            spawn(function()
+                while farmEnabled do
+                    -- Tạo danh sách các NPC Pirate có đủ điều kiện
+                    local pirates = {}
+                    for _, child in ipairs(livingFolder:GetChildren()) do
+                        if child.Name == "Pirate" and child:FindFirstChild("HumanoidRootPart") then
+                            table.insert(pirates, child)
                         end
+                    end
+                    
+                    if #pirates == 0 then
+                        hrp.CFrame = waitingPosition
+                        print("Không có Pirate. Chờ tại vị trí:", waitingPosition.Position)
+                        task.wait(0.1)
+                    else
+                        -- Chọn NPC Pirate gần nhất
+                        local closestPirate = pirates[1]
+                        local closestDistance = (closestPirate.HumanoidRootPart.Position - hrp.Position).Magnitude
+                        for i = 2, #pirates do
+                            local dist = (pirates[i].HumanoidRootPart.Position - hrp.Position).Magnitude
+                            if dist < closestDistance then
+                                closestPirate = pirates[i]
+                                closestDistance = dist
+                            end
+                        end
+                        
+                        local npcHRP = closestPirate.HumanoidRootPart
+                        local desiredPos = npcHRP.Position - npcHRP.CFrame.LookVector * 4
+                        print("Pirate tồn tại. Vị trí mong muốn phía sau Pirate:", desiredPos)
+                        
+                        -- Vòng lặp di chuyển người chơi đến vị trí mong muốn
+                        while farmEnabled and closestPirate and closestPirate:FindFirstChild("HumanoidRootPart") and 
+                              (hrp.Position - desiredPos).Magnitude > 1 do
+                            hrp.CFrame = CFrame.new(desiredPos, npcHRP.Position)
+                            print("Di chuyển tới:", desiredPos, " | Vị trí hiện tại:", hrp.Position)
+                            task.wait(0.1)
+                            
+                            -- Cập nhật lại thông tin nếu Pirate thay đổi vị trí
+                            if closestPirate and closestPirate:FindFirstChild("HumanoidRootPart") then
+                                npcHRP = closestPirate.HumanoidRootPart
+                                desiredPos = npcHRP.Position - npcHRP.CFrame.LookVector * 4
+                            else
+                                break
+                            end
+                        end
+                        
+                        print("Đã đạt vị trí phía sau Pirate. Đang dừng di chuyển và chờ cập nhật.")
                         task.wait(0.1)
                     end
-                end)
-            else
-                Rayfield:Notify({
-                    Title = "Farm Fingers",
-                    Content = "Không tìm thấy NPC!",
-                    Duration = 3
-                })
-            end
+                    task.wait(0.1)  -- Vòng lặp chính chạy mỗi 0.1 giây
+                end
+                print("Farm đã tắt.")
+            end)
         else
-            print("❌ Đã dừng chế độ Farm!")
+            print("Farm đã dừng.")
         end
     end
 })
