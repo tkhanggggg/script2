@@ -43,7 +43,7 @@ FarmTab:CreateToggle({
                             hrp.CFrame = CFrame.new(behindPos, npcHRP.Position)
                         else
                             Rayfield:Notify({
-                                Title = "Farm Fingers",
+                                Title = "Farm",
                                 Content = "Không tìm thấy NPC!",
                                 Duration = 3
                             })
@@ -55,7 +55,7 @@ FarmTab:CreateToggle({
                 end)
             else
                 Rayfield:Notify({
-                    Title = "Farm",
+                    Title = "Farm Fingers",
                     Content = "Không tìm thấy NPC!",
                     Duration = 3
                 })
