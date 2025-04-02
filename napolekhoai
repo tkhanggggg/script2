@@ -12,7 +12,7 @@ local player = game.Players.LocalPlayer
 local farmEnabled = false
 
 FarmTab:CreateToggle({
-    Name = "Farm Fingers",
+    Name = "Farm",
     CurrentValue = false,
     Flag = "FarmToggle",
     Callback = function(Value)
@@ -43,7 +43,7 @@ FarmTab:CreateToggle({
                             hrp.CFrame = CFrame.new(behindPos, npcHRP.Position)
                         else
                             Rayfield:Notify({
-                                Title = "Farm",
+                                Title = "Farm Fingers",
                                 Content = "Không tìm thấy NPC!",
                                 Duration = 3
                             })
