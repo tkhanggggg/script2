@@ -1,155 +1,67 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Khoaiii",
+   LoadingTitle = "script potato",
+   LoadingSubtitle = "by Khoai",
+   Theme = "Default"
+})
+
+local FarmTab = Window:CreateTab("Farm", 4483362458)
 local player = game.Players.LocalPlayer
-local gui = player:WaitForChild("PlayerGui")
-
--- Tạo ScreenGui cho menu
-local menuGui = Instance.new("ScreenGui")
-menuGui.Name = "GameMenu"
-menuGui.Parent = gui
-
--- Tạo menu chính
-local menuFrame = Instance.new("Frame")
-menuFrame.Size = UDim2.new(0, 300, 0, 200)
-menuFrame.Position = UDim2.new(0.2, 0, 0.3, 0) -- đặt vị trí không che quá nhiều màn hình
-menuFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-menuFrame.BorderSizePixel = 2
-menuFrame.Active = true
-menuFrame.Draggable = true
-menuFrame.Parent = menuGui
-
--- Tạo biểu tượng thu nhỏ
-local miniFrame = Instance.new("Frame")
-miniFrame.Size = UDim2.new(0, 100, 0, 40)
-miniFrame.Position = menuFrame.Position
-miniFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-miniFrame.Visible = false
-miniFrame.Parent = menuGui
-
-local miniLabel = Instance.new("TextLabel")
-miniLabel.Size = UDim2.new(1, 0, 1, 0)
-miniLabel.Text = "Menu"
-miniLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-miniLabel.BackgroundTransparency = 1
-miniLabel.Parent = miniFrame
-
--- Nút thu nhỏ (minimize)
-local minimizeButton = Instance.new("TextButton")
-minimizeButton.Size = UDim2.new(0, 50, 0, 30)
-minimizeButton.Position = UDim2.new(1, -55, 0, 5)
-minimizeButton.Text = "-"
-minimizeButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-minimizeButton.Parent = menuFrame
-
--- Nút mở rộng (expand) trên mini menu
-local expandButton = Instance.new("TextButton")
-expandButton.Size = UDim2.new(1, 0, 1, 0)
-expandButton.Text = "Menu"
-expandButton.BackgroundTransparency = 1
-expandButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-expandButton.Parent = miniFrame
-
--- Nút gạt bật/tắt tổng cho chế độ Farm
-local farmToggle = Instance.new("TextButton")
-farmToggle.Size = UDim2.new(1, -10, 0, 40)
-farmToggle.Position = UDim2.new(0, 5, 0, 85)
-farmToggle.Text = "Farm: Tắt"
-farmToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-farmToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-farmToggle.Parent = menuFrame
-
--- Nút "Tắt Farm" hiển thị rõ, để dừng chế độ Farm ngay lập tức
-local stopFarmButton = Instance.new("TextButton")
-stopFarmButton.Size = UDim2.new(1, -10, 0, 40)
-stopFarmButton.Position = UDim2.new(0, 5, 0, 130)  -- đặt ngay dưới nút farmToggle
-stopFarmButton.Text = "Tắt Farm"
-stopFarmButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-stopFarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-stopFarmButton.Visible = false
-stopFarmButton.Parent = menuFrame
-
 local farmEnabled = false
 
-farmToggle.MouseButton1Click:Connect(function()
-    farmEnabled = not farmEnabled
-    if farmEnabled then
-        -- Khi bật chế độ Farm
-        farmToggle.Text = "Farm: Bật"
-        farmToggle.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-        stopFarmButton.Visible = true  -- hiển thị nút tắt
-        
-        -- Kiểm tra NPC
-        local npc = workspace.Living:FindFirstChild("The Strongest In History")
-        if npc and npc:FindFirstChild("HumanoidRootPart") then
-            -- Nếu tìm thấy NPC, dịch chuyển đến vị trí farm
-            player.Character.HumanoidRootPart.CFrame = CFrame.new(-41, 4, -9742)
-            print("🚀 Đã dịch chuyển đến vị trí farm!")
-            
-            -- Tiếp tục dịch chuyển đến sau lưng NPC liên tục
-            spawn(function()
-                while farmEnabled do
-                    local currentNpc = workspace.Living:FindFirstChild("The Strongest In History")
-                    if currentNpc and currentNpc:FindFirstChild("HumanoidRootPart") then
-                        local npcHRP = currentNpc.HumanoidRootPart
-                        local behindPosition = npcHRP.Position - npcHRP.CFrame.LookVector * 4
-                        player.Character.HumanoidRootPart.CFrame = CFrame.new(behindPosition, npcHRP.Position)
-                    else
-                        -- Nếu NPC không tồn tại trong khi chạy, hiện thông báo và thoát vòng lặp
-                        local notify = Instance.new("TextLabel")
-                        notify.Size = UDim2.new(0, 300, 0, 50)
-                        notify.Position = UDim2.new(0.5, -150, 0, 10) -- vị trí trên và giữa màn hình
-                        notify.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-                        notify.BackgroundTransparency = 0.5
-                        notify.TextColor3 = Color3.fromRGB(255, 255, 255)
-                        notify.Text = "Không tìm thấy NPC!"
-                        notify.Parent = menuGui
-                        delay(3, function() 
-                            if notify then notify:Destroy() end
-                        end)
-                        break
+FarmTab:CreateToggle({
+    Name = "Farm",
+    CurrentValue = false,
+    Flag = "FarmToggle",
+    Callback = function(Value)
+        farmEnabled = Value
+        if farmEnabled then
+            local livingFolder = workspace:FindFirstChild("Living")
+            if not livingFolder then
+                Rayfield:Notify({
+                    Title = "Farm",
+                    Content = "Folder 'Living' không tồn tại!",
+                    Duration = 3
+                })
+                return
+            end
+
+            local npc = livingFolder:FindFirstChild("The Strongest In History")
+            local character = player.Character or player.CharacterAdded:Wait()
+            local hrp = character:WaitForChild("HumanoidRootPart")
+
+            if npc and npc:FindFirstChild("HumanoidRootPart") then
+                hrp.CFrame = CFrame.new(-41, 4, -9742)
+                spawn(function()
+                    while farmEnabled do
+                        local currentNpc = livingFolder:FindFirstChild("The Strongest In History")
+                        if currentNpc and currentNpc:FindFirstChild("HumanoidRootPart") then
+                            local npcHRP = currentNpc.HumanoidRootPart
+                            local behindPos = npcHRP.Position - npcHRP.CFrame.LookVector * 4
+                            hrp.CFrame = CFrame.new(behindPos, npcHRP.Position)
+                        else
+                            Rayfield:Notify({
+                                Title = "Farm",
+                                Content = "Không tìm thấy NPC!",
+                                Duration = 3
+                            })
+                            farmEnabled = false
+                            break
+                        end
+                        task.wait(0.1)
                     end
-                    task.wait(0.1)
-                end
-            end)
+                end)
+            else
+                Rayfield:Notify({
+                    Title = "Farm",
+                    Content = "Không tìm thấy NPC!",
+                    Duration = 3
+                })
+            end
         else
-            -- Nếu không tìm thấy NPC: không dịch chuyển, chỉ hiện thông báo
-            print("❌ Không tìm thấy NPC!")
-            local notify = Instance.new("TextLabel")
-            notify.Size = UDim2.new(0, 300, 0, 50)
-            notify.Position = UDim2.new(0.5, -150, 0, 10)
-            notify.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-            notify.BackgroundTransparency = 0.5
-            notify.TextColor3 = Color3.fromRGB(255, 255, 255)
-            notify.Text = "Không tìm thấy NPC!"
-            notify.Parent = menuGui
-            delay(3, function() 
-                if notify then notify:Destroy() end
-            end)
+            print("❌ Đã dừng chế độ Farm!")
         end
-    else
-        -- Khi tắt chế độ Farm bằng cách nhấn lại farmToggle
-        farmToggle.Text = "Farm: Tắt"
-        farmToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-        stopFarmButton.Visible = false
-        print("❌ Đã dừng chế độ Farm!")
     end
-end)
-
-stopFarmButton.MouseButton1Click:Connect(function()
-    -- Khi nhấn nút "Tắt Farm"
-    farmEnabled = false
-    farmToggle.Text = "Farm: Tắt"
-    farmToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    stopFarmButton.Visible = false
-    print("🚫 Farm mode đã được tắt bằng nút Tắt Farm!")
-end)
-
--- Chức năng thu nhỏ/mở rộng menu
-minimizeButton.MouseButton1Click:Connect(function()
-    menuFrame.Visible = false
-    miniFrame.Visible = true
-end)
-
-expandButton.MouseButton1Click:Connect(function()
-    menuFrame.Visible = true
-    miniFrame.Visible = false
-end)
+})
