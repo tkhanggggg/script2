@@ -1,287 +1,146 @@
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+-- Hàm phụ trợ: Lấy root part của nhân vật (HumanoidRootPart nếu có, nếu không thì Torso)
+local function getRootPart(character)
+    return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
+end
 
+-- Rayfield GUI (Menu: Farm Mobs)
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 local Window = Rayfield:CreateWindow({
-    Name = "Farm Pirate",
+    Name = "Farm Mobs",
     LoadingTitle = "Auto Farming System",
     LoadingSubtitle = "By Khoai",
     Theme = "Default"
 })
-
-local FarmTab = Window:CreateTab("Farm Pirate", 4483362458)
+local FarmTab = Window:CreateTab("Farm Mobs", 4483362458)
 local player = game.Players.LocalPlayer
 
 -- Các biến toàn cục
 local autoAttackEnabled = false
 local farmMovementEnabled = false
 local autoSkillMasterEnabled = false
+local teleportEnabled = false  -- Toggle để bật chức năng dịch chuyển đến chest
+local npcFound = false       -- Biến để xác nhận có NPC (Pirate) hay không
 
--- Vị trí chờ cố định khi không có NPC Pirate
+-- Vị trí chờ mặc định (nếu không có NPC hoặc chest không tồn tại)
 local waitingPosition = CFrame.new(-3355, 918, 15241)
 
--------------------------------------------------------
--- SECTION: Auto Attack & Farm Movement (Đưa lên đầu)
--------------------------------------------------------
-FarmTab:CreateSection("Auto Attack & Farm Movement")
+-- Danh sách chest cần kiểm tra khi không có NPC
+local chestNames = { "Common_Chest", "Rare_Chest", "Epic_Chest", "Legendary_Chest" }
+local chestToggles = {}
 
--- Auto Attack Toggle
+FarmTab:CreateSection("Chest Teleport")
+
+for _, chestName in ipairs(chestNames) do
+    FarmTab:CreateToggle({
+        Name = "Dịch chuyển đến " .. chestName,
+        CurrentValue = false,
+        Flag = chestName .. "_Toggle",
+        Callback = function(Value)
+            chestToggles[chestName] = Value
+            print("Dịch chuyển đến " .. chestName .. ": " .. tostring(Value))
+        end
+    })
+end
+
+-- Khi không có NPC, kiểm tra và dịch chuyển đến chest theo danh sách
+local function teleportToAvailableChest(hrp)
+    for _, chestName in ipairs(chestNames) do
+        local chest = workspace:FindFirstChild(chestName)
+        if chestToggles[chestName] and chest and chest:IsA("BasePart") then
+            hrp.CFrame = CFrame.new(chest.Position) + Vector3.new(0, 5, 0)
+            print("Dịch chuyển đến " .. chestName .. " tại vị trí: " .. tostring(chest.Position))
+            return  -- Ngừng kiểm tra sau khi đã dịch chuyển đến một chest hợp lệ
+        end
+    end
+    -- Nếu không có chest nào, về vị trí chờ mặc định
+    hrp.CFrame = waitingPosition
+    print("Không tìm thấy chest, về vị trí chờ mặc định.")
+end
+
+-------------------------------------------------------
+-- SECTION: Auto Attack (Luôn hoạt động khi có NPC)
+-------------------------------------------------------
 FarmTab:CreateToggle({
     Name = "Auto Attack",
     CurrentValue = false,
     Flag = "AutoAttackToggle",
     Callback = function(Value)
         autoAttackEnabled = Value
-        if autoAttackEnabled then
-            spawn(function()
-                local fireInput = game:GetService("ReplicatedStorage")
-                    :WaitForChild("ReplicatedModules")
-                    :WaitForChild("KnitPackage")
-                    :WaitForChild("Knit")
-                    :WaitForChild("Services")
-                    :WaitForChild("MoveInputService")
-                    :WaitForChild("RF")
-                    :WaitForChild("FireInput")
-                print("[Auto Attack] Bắt đầu tấn công...")
-                while autoAttackEnabled do
-                    local args = { [1] = "MouseButton1" }
-                    fireInput:InvokeServer(unpack(args))
-                    task.wait(0.01)
+        spawn(function()
+            local fireInput = game:GetService("ReplicatedStorage")
+                :WaitForChild("ReplicatedModules")
+                :WaitForChild("KnitPackage")
+                :WaitForChild("Knit")
+                :WaitForChild("Services")
+                :WaitForChild("MoveInputService")
+                :WaitForChild("RF")
+                :WaitForChild("FireInput")
+            print("[Auto Attack] Bắt đầu tấn công...")
+            while autoAttackEnabled do
+                if npcFound then  
+                    fireInput:InvokeServer("MouseButton1")
                 end
-                print("[Auto Attack] Auto Attack đã dừng.")
-            end)
-        else
-            print("[Auto Attack] Đã tắt Auto Attack.")
-        end
+                task.wait(0.01)
+            end
+            print("[Auto Attack] Auto Attack đã dừng.")
+        end)
     end
 })
 
--- Farm Movement Toggle
+-------------------------------------------------------
+-- SECTION: Farm Movement (Luôn giữ nhân vật ở sau NPC và xoay theo hướng NPC)
+-------------------------------------------------------
 FarmTab:CreateToggle({
     Name = "Farm Movement",
     CurrentValue = false,
     Flag = "FarmMovementToggle",
     Callback = function(Value)
         farmMovementEnabled = Value
-        if farmMovementEnabled then
-            spawn(function()
-                local livingFolder = workspace:FindFirstChild("Living")
-                if not livingFolder then
-                    Rayfield:Notify({
-                        Title = "Farm Movement",
-                        Content = "Folder 'Living' không tồn tại!",
-                        Duration = 3
-                    })
-                    return
+        spawn(function()
+            local livingFolder = workspace:FindFirstChild("Living")
+            if not livingFolder then
+                Rayfield:Notify({
+                    Title = "Farm Movement",
+                    Content = "Folder 'Living' không tồn tại!",
+                    Duration = 3
+                })
+                return
+            end
+            local character = player.Character or player.CharacterAdded:Wait()
+            local hrp = getRootPart(character)
+            print("[Farm Movement] Bắt đầu di chuyển...")
+            while farmMovementEnabled do
+                local pirates = {}
+                for _, child in ipairs(livingFolder:GetChildren()) do
+                    local pr = getRootPart(child)
+                    if child.Name == "Pirate" and pr then
+                        table.insert(pirates, child)
+                    end
                 end
 
-                local character = player.Character or player.CharacterAdded:Wait()
-                local hrp = character:WaitForChild("HumanoidRootPart")
-                hrp.CFrame = waitingPosition
-                print("[Farm Movement] Đưa người chơi về vị trí chờ:", waitingPosition.Position)
-                
-                while farmMovementEnabled do
-                    local pirates = {}
-                    for _, child in ipairs(livingFolder:GetChildren()) do
-                        if child.Name == "Pirate" and child:FindFirstChild("HumanoidRootPart") then
-                            table.insert(pirates, child)
+                if #pirates > 0 then
+                    npcFound = true
+                    local closestPirate = pirates[1]
+                    for i = 2, #pirates do
+                        local cp = getRootPart(closestPirate)
+                        local pp = getRootPart(pirates[i])
+                        if cp and pp and (pp.Position - hrp.Position).Magnitude < (cp.Position - hrp.Position).Magnitude then
+                            closestPirate = pirates[i]
                         end
                     end
-                    
-                    if #pirates == 0 then
-                        hrp.CFrame = waitingPosition
-                        print("[Farm Movement] Không có Pirate. Giữ nguyên vị trí chờ.")
-                    else
-                        local closestPirate = pirates[1]
-                        local closestDistance = (closestPirate.HumanoidRootPart.Position - hrp.Position).Magnitude
-                        for i = 2, #pirates do
-                            local dist = (pirates[i].HumanoidRootPart.Position - hrp.Position).Magnitude
-                            if dist < closestDistance then
-                                closestPirate = pirates[i]
-                                closestDistance = dist
-                            end
-                        end
-                        
-                        if closestPirate then
-                            local npcHRP = closestPirate:FindFirstChild("HumanoidRootPart")
-                            if npcHRP then
-                                local desiredPos = npcHRP.Position - npcHRP.CFrame.LookVector * 4
-                                while farmMovementEnabled and closestPirate and (hrp.Position - desiredPos).Magnitude > 1 do
-                                    hrp.CFrame = CFrame.new(desiredPos, npcHRP.Position)
-                                    print("[Farm Movement] Di chuyển tới:", desiredPos)
-                                    task.wait(0.1)
-                                    npcHRP = closestPirate:FindFirstChild("HumanoidRootPart")
-                                    if npcHRP then
-                                        desiredPos = npcHRP.Position - npcHRP.CFrame.LookVector * 4
-                                    else
-                                        break
-                                    end
-                                end
-                            end
-                        end
+                    local npcHRP = getRootPart(closestPirate)
+                    if npcHRP then
+                        local desiredPos = npcHRP.Position - npcHRP.CFrame.LookVector * 6
+                        hrp.CFrame = CFrame.lookAt(desiredPos, npcHRP.Position) -- Luôn giữ vị trí sau NPC và xoay về hướng của NPC
+                        print("[Farm Movement] Giữ nhân vật phía sau NPC và xoay về hướng NPC:", npcHRP.Position)
                     end
-                    task.wait(0.1)
+                else
+                    npcFound = false
+                    teleportToAvailableChest(hrp)
                 end
-                print("[Farm Movement] Farm Movement tắt.")
-            end)
-        else
+                task.wait(0.1)
+            end
             print("[Farm Movement] Đã tắt Farm Movement.")
-        end
-    end
-})
-
--------------------------------------------------------
--- SECTION: Auto Skill (Để phía dưới)
--------------------------------------------------------
-FarmTab:CreateSection("Auto Skill")
-
--- Bảng lưu trạng thái cho từng skill
-local autoSkillToggles = {
-    E = false,
-    R = false,
-    T = false,
-    Y = false,
-    G = false,
-    H = false,
-    V = false,
-    Z = false,
-    B = false,
-    U = false,
-}
-
--- Toggle chính để kích hoạt Auto Skill Master
-FarmTab:CreateToggle({
-    Name = "Auto Skill Master",
-    CurrentValue = false,
-    Flag = "AutoSkillMasterToggle",
-    Callback = function(Value)
-        autoSkillMasterEnabled = Value
-        if autoSkillMasterEnabled then
-            spawn(function()
-                local skillInput = game:GetService("ReplicatedStorage")
-                    :WaitForChild("ReplicatedModules")
-                    :WaitForChild("KnitPackage")
-                    :WaitForChild("Knit")
-                    :WaitForChild("Services")
-                    :WaitForChild("MoveInputService")
-                    :WaitForChild("RF")
-                    :WaitForChild("FireInput")
-                print("[Auto Skill] Bắt đầu Auto Skill Master")
-                while autoSkillMasterEnabled do
-                    -- Duyệt theo thứ tự: E, R, T, Y, G, H, V, Z, B, U
-                    for _, letter in ipairs({"E", "R", "T", "Y", "G", "H", "V", "Z", "B", "U"}) do
-                        if autoSkillToggles[letter] then
-                            local args = { [1] = letter }
-                            skillInput:InvokeServer(unpack(args))
-                            print("Used Auto Skill: " .. letter)
-                            task.wait(0.5) -- Thời gian giữa mỗi kỹ năng
-                        end
-                    end
-                    task.wait(0.2)
-                end
-                print("[Auto Skill] Auto Skill Master tắt.")
-            end)
-        else
-            print("[Auto Skill] Đã tắt Auto Skill Master.")
-        end
-    end
-})
-
--- Toggle riêng cho từng skill
-FarmTab:CreateToggle({
-    Name = "Skill E",
-    CurrentValue = false,
-    Flag = "AutoSkillE",
-    Callback = function(Value)
-        autoSkillToggles.E = Value
-        print("[Auto Skill] Skill E:", Value)
-    end
-})
-
-FarmTab:CreateToggle({
-    Name = "Skill R",
-    CurrentValue = false,
-    Flag = "AutoSkillR",
-    Callback = function(Value)
-        autoSkillToggles.R = Value
-        print("[Auto Skill] Skill R:", Value)
-    end
-})
-
-FarmTab:CreateToggle({
-    Name = "Skill T",
-    CurrentValue = false,
-    Flag = "AutoSkillT",
-    Callback = function(Value)
-        autoSkillToggles.T = Value
-        print("[Auto Skill] Skill T:", Value)
-    end
-})
-
-FarmTab:CreateToggle({
-    Name = "Skill Y",
-    CurrentValue = false,
-    Flag = "AutoSkillY",
-    Callback = function(Value)
-        autoSkillToggles.Y = Value
-        print("[Auto Skill] Skill Y:", Value)
-    end
-})
-
-FarmTab:CreateToggle({
-    Name = "Skill G",
-    CurrentValue = false,
-    Flag = "AutoSkillG",
-    Callback = function(Value)
-        autoSkillToggles.G = Value
-        print("[Auto Skill] Skill G:", Value)
-    end
-})
-
-FarmTab:CreateToggle({
-    Name = "Skill H",
-    CurrentValue = false,
-    Flag = "AutoSkillH",
-    Callback = function(Value)
-        autoSkillToggles.H = Value
-        print("[Auto Skill] Skill H:", Value)
-    end
-})
-
-FarmTab:CreateToggle({
-    Name = "Skill V",
-    CurrentValue = false,
-    Flag = "AutoSkillV",
-    Callback = function(Value)
-        autoSkillToggles.V = Value
-        print("[Auto Skill] Skill V:", Value)
-    end
-})
-
-FarmTab:CreateToggle({
-    Name = "Skill Z",
-    CurrentValue = false,
-    Flag = "AutoSkillZ",
-    Callback = function(Value)
-        autoSkillToggles.Z = Value
-        print("[Auto Skill] Skill Z:", Value)
-    end
-})
-
-FarmTab:CreateToggle({
-    Name = "Skill B",
-    CurrentValue = false,
-    Flag = "AutoSkillB",
-    Callback = function(Value)
-        autoSkillToggles.B = Value
-        print("[Auto Skill] Skill B:", Value)
-    end
-})
-
-FarmTab:CreateToggle({
-    Name = "Skill U",
-    CurrentValue = false,
-    Flag = "AutoSkillU",
-    Callback = function(Value)
-        autoSkillToggles.U = Value
-        print("[Auto Skill] Skill U:", Value)
+        end)
     end
 })
