@@ -10,15 +10,51 @@ local Window = Rayfield:CreateWindow({
 local FarmTab = Window:CreateTab("Farm Pirate", 4483362458)
 local player = game.Players.LocalPlayer
 
--- Vị trí chờ cố định
+-- Các biến toàn cục
+local autoAttackEnabled = false
+local farmMovementEnabled = false
+local autoSkillMasterEnabled = false
+
+-- Vị trí chờ cố định khi không có NPC Pirate
 local waitingPosition = CFrame.new(-3355, 918, 15241)
 
------------------------------------------
--- SECTION: Farm Movement (di chuyển)
------------------------------------------
-FarmTab:CreateSection("Farm Movement")
+-------------------------------------------------------
+-- SECTION: Auto Attack & Farm Movement (Đưa lên đầu)
+-------------------------------------------------------
+FarmTab:CreateSection("Auto Attack & Farm Movement")
 
-local farmMovementEnabled = false
+-- Auto Attack Toggle
+FarmTab:CreateToggle({
+    Name = "Auto Attack",
+    CurrentValue = false,
+    Flag = "AutoAttackToggle",
+    Callback = function(Value)
+        autoAttackEnabled = Value
+        if autoAttackEnabled then
+            spawn(function()
+                local fireInput = game:GetService("ReplicatedStorage")
+                    :WaitForChild("ReplicatedModules")
+                    :WaitForChild("KnitPackage")
+                    :WaitForChild("Knit")
+                    :WaitForChild("Services")
+                    :WaitForChild("MoveInputService")
+                    :WaitForChild("RF")
+                    :WaitForChild("FireInput")
+                print("[Auto Attack] Bắt đầu tấn công...")
+                while autoAttackEnabled do
+                    local args = { [1] = "MouseButton1" }
+                    fireInput:InvokeServer(unpack(args))
+                    task.wait(0.01)
+                end
+                print("[Auto Attack] Auto Attack đã dừng.")
+            end)
+        else
+            print("[Auto Attack] Đã tắt Auto Attack.")
+        end
+    end
+})
+
+-- Farm Movement Toggle
 FarmTab:CreateToggle({
     Name = "Farm Movement",
     CurrentValue = false,
@@ -39,7 +75,6 @@ FarmTab:CreateToggle({
 
                 local character = player.Character or player.CharacterAdded:Wait()
                 local hrp = character:WaitForChild("HumanoidRootPart")
-                
                 hrp.CFrame = waitingPosition
                 print("[Farm Movement] Đưa người chơi về vị trí chờ:", waitingPosition.Position)
                 
@@ -53,7 +88,7 @@ FarmTab:CreateToggle({
                     
                     if #pirates == 0 then
                         hrp.CFrame = waitingPosition
-                        print("[Farm Movement] Không có Pirate. Chờ tại vị trí:", waitingPosition.Position)
+                        print("[Farm Movement] Không có Pirate. Giữ nguyên vị trí chờ.")
                     else
                         local closestPirate = pirates[1]
                         local closestDistance = (closestPirate.HumanoidRootPart.Position - hrp.Position).Magnitude
@@ -66,20 +101,26 @@ FarmTab:CreateToggle({
                         end
                         
                         if closestPirate then
-                            local npcHRP = closestPirate.HumanoidRootPart
-                            local desiredPos = npcHRP.Position - npcHRP.CFrame.LookVector * 4
-                            print("[Farm Movement] Pirate tồn tại. Di chuyển đến vị trí sau Pirate:", desiredPos)
-                            
-                            while farmMovementEnabled and closestPirate and (hrp.Position - desiredPos).Magnitude > 1 do
-                                hrp.CFrame = CFrame.new(desiredPos, npcHRP.Position)
-                                print("[Farm Movement] Đã duy trì vị trí sau Pirate.")
-                                task.wait(0.1)
+                            local npcHRP = closestPirate:FindFirstChild("HumanoidRootPart")
+                            if npcHRP then
+                                local desiredPos = npcHRP.Position - npcHRP.CFrame.LookVector * 4
+                                while farmMovementEnabled and closestPirate and (hrp.Position - desiredPos).Magnitude > 1 do
+                                    hrp.CFrame = CFrame.new(desiredPos, npcHRP.Position)
+                                    print("[Farm Movement] Di chuyển tới:", desiredPos)
+                                    task.wait(0.1)
+                                    npcHRP = closestPirate:FindFirstChild("HumanoidRootPart")
+                                    if npcHRP then
+                                        desiredPos = npcHRP.Position - npcHRP.CFrame.LookVector * 4
+                                    else
+                                        break
+                                    end
+                                end
                             end
                         end
                     end
                     task.wait(0.1)
                 end
-                print("[Farm Movement] Farm Movement đã tắt.")
+                print("[Farm Movement] Farm Movement tắt.")
             end)
         else
             print("[Farm Movement] Đã tắt Farm Movement.")
@@ -87,95 +128,160 @@ FarmTab:CreateToggle({
     end
 })
 
------------------------------------------
--- SECTION: Auto Attack (tấn công nhanh)
------------------------------------------
-FarmTab:CreateSection("Auto Attack")
-
-local autoAttackEnabled = false
-FarmTab:CreateToggle({
-    Name = "Auto Attack",
-    CurrentValue = false,
-    Flag = "AutoAttackToggle",
-    Callback = function(Value)
-        autoAttackEnabled = Value
-        if autoAttackEnabled then
-            spawn(function()
-                local fireInput = game:GetService("ReplicatedStorage")
-                                    :WaitForChild("ReplicatedModules")
-                                    :WaitForChild("KnitPackage")
-                                    :WaitForChild("Knit")
-                                    :WaitForChild("Services")
-                                    :WaitForChild("MoveInputService")
-                                    :WaitForChild("RF")
-                                    :WaitForChild("FireInput")
-                
-                print("[Auto Attack] Bắt đầu tấn công với tốc độ cao!")
-                
-                while autoAttackEnabled do
-                    local args = { [1] = "MouseButton1" }
-                    fireInput:InvokeServer(unpack(args))
-                    task.wait(0.01) -- tăng tốc bằng cách giảm thời gian chờ
-                end
-                
-                print("[Auto Attack] Auto Attack đã dừng.")
-            end)
-        else
-            print("[Auto Attack] Đã tắt Auto Attack.")
-        end
-    end
-})
-
------------------------------------------
--- SECTION: Auto Skill (Kỹ năng tự động)
------------------------------------------
+-------------------------------------------------------
+-- SECTION: Auto Skill (Để phía dưới)
+-------------------------------------------------------
 FarmTab:CreateSection("Auto Skill")
 
-local autoSkillEnabled = false
-local selectedSkill = "None"
+-- Bảng lưu trạng thái cho từng skill
+local autoSkillToggles = {
+    E = false,
+    R = false,
+    T = false,
+    Y = false,
+    G = false,
+    H = false,
+    V = false,
+    Z = false,
+    B = false,
+    U = false,
+}
 
-FarmTab:CreateDropdown({
-    Name = "Chọn Kỹ Năng",
-    Options = { "Skill1", "Skill2", "Skill3", "Skill4" },
-    CurrentOption = "None",
-    Flag = "AutoSkillDropdown",
-    Callback = function(Option)
-        selectedSkill = Option
-        print("[Auto Skill] Đã chọn kỹ năng:", selectedSkill)
+-- Toggle chính để kích hoạt Auto Skill Master
+FarmTab:CreateToggle({
+    Name = "Auto Skill Master",
+    CurrentValue = false,
+    Flag = "AutoSkillMasterToggle",
+    Callback = function(Value)
+        autoSkillMasterEnabled = Value
+        if autoSkillMasterEnabled then
+            spawn(function()
+                local skillInput = game:GetService("ReplicatedStorage")
+                    :WaitForChild("ReplicatedModules")
+                    :WaitForChild("KnitPackage")
+                    :WaitForChild("Knit")
+                    :WaitForChild("Services")
+                    :WaitForChild("MoveInputService")
+                    :WaitForChild("RF")
+                    :WaitForChild("FireInput")
+                print("[Auto Skill] Bắt đầu Auto Skill Master")
+                while autoSkillMasterEnabled do
+                    -- Duyệt theo thứ tự: E, R, T, Y, G, H, V, Z, B, U
+                    for _, letter in ipairs({"E", "R", "T", "Y", "G", "H", "V", "Z", "B", "U"}) do
+                        if autoSkillToggles[letter] then
+                            local args = { [1] = letter }
+                            skillInput:InvokeServer(unpack(args))
+                            print("Used Auto Skill: " .. letter)
+                            task.wait(0.5) -- Thời gian giữa mỗi kỹ năng
+                        end
+                    end
+                    task.wait(0.2)
+                end
+                print("[Auto Skill] Auto Skill Master tắt.")
+            end)
+        else
+            print("[Auto Skill] Đã tắt Auto Skill Master.")
+        end
+    end
+})
+
+-- Toggle riêng cho từng skill
+FarmTab:CreateToggle({
+    Name = "Skill E",
+    CurrentValue = false,
+    Flag = "AutoSkillE",
+    Callback = function(Value)
+        autoSkillToggles.E = Value
+        print("[Auto Skill] Skill E:", Value)
     end
 })
 
 FarmTab:CreateToggle({
-    Name = "Auto Skill",
+    Name = "Skill R",
     CurrentValue = false,
-    Flag = "AutoSkillToggle",
+    Flag = "AutoSkillR",
     Callback = function(Value)
-        autoSkillEnabled = Value
-        if autoSkillEnabled then
-            spawn(function()
-                local skillInput = game:GetService("ReplicatedStorage")
-                                    :WaitForChild("ReplicatedModules")
-                                    :WaitForChild("KnitPackage")
-                                    :WaitForChild("Knit")
-                                    :WaitForChild("Services")
-                                    :WaitForChild("SkillService")
-                                    :WaitForChild("RF")
-                                    :WaitForChild("UseSkill")
-                
-                print("[Auto Skill] Tự động sử dụng kỹ năng:", selectedSkill)
-                
-                while autoSkillEnabled do
-                    if selectedSkill ~= "None" then
-                        local args = { [1] = selectedSkill }
-                        skillInput:InvokeServer(unpack(args))
-                    end
-                    task.wait(1.0) -- Điều chỉnh tốc độ kỹ năng tại đây
-                end
-                
-                print("[Auto Skill] Đã dừng Auto Skill.")
-            end)
-        else
-            print("[Auto Skill] Đã tắt Auto Skill.")
-        end
+        autoSkillToggles.R = Value
+        print("[Auto Skill] Skill R:", Value)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Skill T",
+    CurrentValue = false,
+    Flag = "AutoSkillT",
+    Callback = function(Value)
+        autoSkillToggles.T = Value
+        print("[Auto Skill] Skill T:", Value)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Skill Y",
+    CurrentValue = false,
+    Flag = "AutoSkillY",
+    Callback = function(Value)
+        autoSkillToggles.Y = Value
+        print("[Auto Skill] Skill Y:", Value)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Skill G",
+    CurrentValue = false,
+    Flag = "AutoSkillG",
+    Callback = function(Value)
+        autoSkillToggles.G = Value
+        print("[Auto Skill] Skill G:", Value)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Skill H",
+    CurrentValue = false,
+    Flag = "AutoSkillH",
+    Callback = function(Value)
+        autoSkillToggles.H = Value
+        print("[Auto Skill] Skill H:", Value)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Skill V",
+    CurrentValue = false,
+    Flag = "AutoSkillV",
+    Callback = function(Value)
+        autoSkillToggles.V = Value
+        print("[Auto Skill] Skill V:", Value)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Skill Z",
+    CurrentValue = false,
+    Flag = "AutoSkillZ",
+    Callback = function(Value)
+        autoSkillToggles.Z = Value
+        print("[Auto Skill] Skill Z:", Value)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Skill B",
+    CurrentValue = false,
+    Flag = "AutoSkillB",
+    Callback = function(Value)
+        autoSkillToggles.B = Value
+        print("[Auto Skill] Skill B:", Value)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Skill U",
+    CurrentValue = false,
+    Flag = "AutoSkillU",
+    Callback = function(Value)
+        autoSkillToggles.U = Value
+        print("[Auto Skill] Skill U:", Value)
     end
 })
