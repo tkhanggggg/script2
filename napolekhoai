@@ -144,3 +144,38 @@ FarmTab:CreateToggle({
         end)
     end
 })
+
+-------------------------------------------------------
+-- SECTION: Auto Skill Master (Luôn hoạt động khi có NPC)
+-------------------------------------------------------
+FarmTab:CreateToggle({
+    Name = "Auto Skill Master",
+    CurrentValue = false,
+    Flag = "AutoSkillMasterToggle",
+    Callback = function(Value)
+        autoSkillMasterEnabled = Value
+        spawn(function()
+            local skillInput = game:GetService("ReplicatedStorage")
+                :WaitForChild("ReplicatedModules")
+                :WaitForChild("KnitPackage")
+                :WaitForChild("Knit")
+                :WaitForChild("Services")
+                :WaitForChild("MoveInputService")
+                :WaitForChild("RF")
+                :WaitForChild("FireInput")
+            print("[Auto Skill] Bắt đầu Auto Skill Master")
+            while autoSkillMasterEnabled do
+                if npcFound then  
+                    for _, letter in ipairs({"E", "R", "T", "Y", "G", "H", "V", "Z", "B", "U"}) do
+                        skillInput:InvokeServer(letter)
+                        print("Used Auto Skill: " .. letter)
+                        task.wait(0.5)
+                    end
+                else
+                    task.wait(0.2)
+                end
+            end
+            print("[Auto Skill] Auto Skill Master tắt.")
+        end)
+    end
+})
